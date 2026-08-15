@@ -1,310 +1,246 @@
-import streamlit as st
-import folium
-from streamlit_folium import st_folium
-from gtts import gTTS
 import os
+import json
+import math
+import random
+from datetime import datetime
+from flask import Flask, render_template, request, jsonify, send_file
 
-# -------------------------------------------------------------
-# 1. STREAMLIT CONFIGURATION & STYLING
-# -------------------------------------------------------------
-st.set_page_config(
-    page_title="BhoomiAI — DIGIPIN Multi-Year Satellite AI & Bhashini Voice",
-    page_icon="🛰️",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+app = Flask(__name__)
 
-st.markdown("""
-<style>
-  .main { background-color: #070b14; color: #f8fafc; }
-  .digipin-hero { background: linear-gradient(135deg, #0e1526, #1b253b); border: 2px solid #0284c7; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 20px rgba(2, 132, 199, 0.25); }
-  .digipin-badge { font-size: 22px; font-weight: 900; font-family: monospace; color: #38bdf8; letter-spacing: 1px; }
-  .patta-card { background: linear-gradient(135deg, #091f16, #0e3022); border: 1.5px solid #10b981; border-radius: 10px; padding: 14px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(16,185,129,0.15); }
-  .landmark-card { background: #080f1e; border: 1px solid #1e3a8a; border-radius: 10px; padding: 14px; margin-bottom: 12px; }
-  .bhashini-card { background: linear-gradient(135deg, #091528, #0f1c36); border: 1px solid #38bdf8; border-radius: 10px; padding: 14px; margin-bottom: 12px; }
-  .stButton>button { border-radius: 6px; font-weight: bold; }
-</style>
-""", unsafe_allow_html=True)
-
-# -------------------------------------------------------------
-# 2. SECURITY & DATABASES
-# -------------------------------------------------------------
-OWNER_PASSCODES = ["LITHU_@1234", "OWNER9940", "LIDI2026", "9443865911"]
-
-LANDMARK_DB = {
-    "M9F 4LLM LFC": {
-        "formatted": "M9F-4LLM-LFC",
-        "lat": 11.1477, "lon": 77.1408,
-        "name": "KPR இன்ஸ்டிடியூட் ஆஃப் இன்ஜினியரிங் & டெக்னாலஜி, கோயம்புத்தூர்",
-        "pattaNo": "2045", "oldPattaNo": "1120 (கல்வி அறக்கட்டளை)", "surveyNo": "162 / 3A",
-        "ownerName": "KPR கல்வி அறக்கட்டளை (KPR Educational Trust)",
-        "landType": "கல்வி நிறுவனம் & கல்லூரி வளாக மனை (Institutional Campus)",
-        "extent": "35.0 ஏக்கர் (KPR கல்லூரி வளாகம்)",
-        "street": "அவிநாசி மெயின் ரோடு & பாரதி விடுதி (Avinashi Road, Arasur)",
-        "govtBuilding": "🏛️ KPR பொறியியல் கல்லூரி & PNB ஏடிஎம் (50m)",
-        "waterBody": "🌊 கல்லூரி பசுமை வளாக நீர்நிலை (150m)",
-        "busStop": "🚌 KPR கல்லூரி பேருந்து நிறுத்தம் / அரசூர் (200m)",
-        "taluk": "சூலூர் தாலுகா, கோயம்புத்தூர் மாவட்டம் - 641407",
-        "constVal": "+850 m² (Hostel Block)", "vegVal": "+15.2%", "roadVal": "+450m",
-        "waterVal": "நீர்நிலை சீரானது (Stable)",
-        "reportTa": "டிஜிபின் M9F-4LLM-LFC அதிகாரப்பூர்வ அஞ்சல் முகவரி: KPR இன்ஸ்டிடியூட் ஆஃப் இன்ஜினியரிங் அண்ட் டெக்னாலஜி வளாகம், பாரதி விடுதி பகுதி, அரசூர், அவிநாசி ரோடு, சூலூர் தாலுகா, கோயம்புத்தூர் மாவட்டம் (641407). பட்டா எண் 2045, புல எண் 162/3A. கடந்த ஆண்டுகளுடன் ஒப்பிடும்போது 850 சதுர மீட்டர் புதிய கட்டட விரிவாக்கம் மற்றும் பசுமை வளாகம் கண்டறியப்பட்டுள்ளது."
+# Sample Pre-Configured Underwriting Profiles
+PROFILES_DB = {
+    "ABCDE1234F": {
+        "pan": "ABCDE1234F",
+        "name": "Selvakumar Panneerselvam",
+        "mobile": "9840123456",
+        "email": "selvakumar@example.com",
+        "applicant_type": "Salaried Senior Executive",
+        "company": "Quest Global Engineering Services Pvt Ltd",
+        "role": "Senior AI & Computer Vision Tech Lead",
+        "monthly_salary": 145000,
+        "cibil_score": 792,
+        "cibil_grade": "Prime (Excellent)",
+        "active_loans_count": 2,
+        "active_loans_debt": 5570000,
+        "current_monthly_emi": 60000,
+        "foir_ratio": 41.3,
+        "bureau_overdue": 0,
+        "bank_avg_balance": 485000,
+        "bank_monthly_inflow": 165000,
+        "gst_turnover": 0,
+        "max_approved_limit": 2500000,
+        "interest_rate": 10.25,
+        "risk_category": "Tier-1 Low Risk",
+        "speech_ta": "வணக்கம் செல்வகுமார். உங்களின் CIBIL ஸ்கோர் 792 மற்றும் வங்கி வரவு ஆய்வு செய்யப்பட்டு, ₹25,00,000 வரை உடனடி கடன் வரம்பு 10.25% வட்டியில் ஒப்புதல் செய்யப்பட்டுள்ளது.",
+        "speech_en": "Hello Selvakumar. Based on your CIBIL score of 792 and banking cashflows, an instant loan limit of ₹25 Lakhs has been pre-approved at 10.25% APR."
     },
-    "M8J LJLC 5C2": {
-        "formatted": "M8J-LJLC-5C2",
-        "lat": 10.4326, "lon": 79.3184,
-        "name": "அதம்பை தெற்கு, பட்டுக்கோட்டை தாலுகா, தஞ்சாவூர்",
-        "pattaNo": "1408", "oldPattaNo": "824 (பழைய மூலப் பட்டா)", "surveyNo": "142 / 2A",
-        "ownerName": "செல்வகுமார் பன்னீர்செல்வம் (Selvakumar Panneerselvam)",
-        "landType": "நன்செய் பட்டா நிலம் (Coconut & Paddy Farm)",
-        "extent": "0.85 ஏக்கர் (37,026 சதுர அடி)",
-        "street": "அதம்பை தெற்கு மெயின் ரோடு & தோப்பு சாலை",
-        "govtBuilding": "🏛️ கிராம ஊராட்சி மன்ற அலுவலகம் & ரேஷன் கடை (350m)",
-        "waterBody": "🌊 கல்லணைக் கால்வாய் பாசன வாய்க்கால் (180m)",
-        "busStop": "🚌 அதம்பை தெற்கு பேருந்து நிறுத்தம் (220m)",
-        "taluk": "அதம்பை தெற்கு, பட்டுக்கோட்டை தாலுகா, தஞ்சாவூர் - 614602",
-        "constVal": "+160 m² (Farm House)", "vegVal": "+24.8%", "roadVal": "+280m",
-        "waterVal": "பாசன வாய்க்கால் சீரானது",
-        "reportTa": "டிஜிபின் M8J-LJLC-5C2 நில உரிமை & பட்டா அறிக்கை: சரியான முகவரி - அதம்பை தெற்கு, பட்டுக்கோட்டை தாலுகா, தஞ்சாவூர் மாவட்டம் (614602). பட்டா எண்: 1408, புல எண்: 142/2A. உரிமையாளர்: செல்வகுமார் பன்னீர்செல்வம். முந்தைய ஆண்டுடன் ஒப்பிடும்போது தென்னந்தோப்பு பசுமை பரப்பு +24.8% அதிகரித்துள்ளது."
+    "BKMPR9876K": {
+        "pan": "BKMPR9876K",
+        "name": "Chola Agri Exports & Coconut Mandi",
+        "mobile": "9443211223",
+        "email": "chola.agri@example.com",
+        "applicant_type": "MSME / Business Enterprise",
+        "company": "Chola Agri Exports Pvt Ltd",
+        "role": "Managing Director & Promoter",
+        "monthly_salary": 250000,
+        "cibil_score": 765,
+        "cibil_grade": "Very Good (MSME Commercial Prime)",
+        "active_loans_count": 2,
+        "active_loans_debt": 8500000,
+        "current_monthly_emi": 88000,
+        "foir_ratio": 35.2,
+        "bureau_overdue": 0,
+        "bank_avg_balance": 1850000,
+        "bank_monthly_inflow": 720000,
+        "gst_turnover": 8500000,
+        "max_approved_limit": 5000000,
+        "interest_rate": 11.50,
+        "risk_category": "MSME Commercial Grade A",
+        "speech_ta": "வணக்கம். உங்களின் வணிக ஜிஎஸ்டி ஆண்டு வருவாய் ₹85 லட்சம் மற்றும் CIBIL ஸ்கோர் 765 அடிப்படையில், ₹50,00,000 வரை உடனடி வணிகக் கடன் ஒப்புதல் செய்யப்பட்டுள்ளது.",
+        "speech_en": "Welcome. Based on your GST turnover of ₹85 Lakhs and CIBIL score of 765, a business loan of ₹50 Lakhs has been pre-approved at 11.50% APR."
+    },
+    "PQXYZ5432M": {
+        "pan": "PQXYZ5432M",
+        "name": "Karthik Ramanathan",
+        "mobile": "9789055667",
+        "email": "karthik.r@example.com",
+        "applicant_type": "Salaried IT Professional",
+        "company": "Tata Consultancy Services Ltd (TCS)",
+        "role": "Senior Software Engineer",
+        "monthly_salary": 85000,
+        "cibil_score": 780,
+        "cibil_grade": "Excellent",
+        "active_loans_count": 1,
+        "active_loans_debt": 850000,
+        "current_monthly_emi": 145000,
+        "foir_ratio": 25.8,
+        "bureau_overdue": 0,
+        "bank_avg_balance": 240000,
+        "bank_monthly_inflow": 92000,
+        "gst_turnover": 0,
+        "max_approved_limit": 1200000,
+        "interest_rate": 10.75,
+        "risk_category": "Tier-1 Low Risk",
+        "speech_ta": "வணக்கம் கார்த்திக். உங்களின் CIBIL ஸ்கோர் 780 அடிப்படையில் ₹12,00,000 தனிநபர் கடன் 10.75% வட்டியில் ஒப்புதல் செய்யப்பட்டுள்ளது.",
+        "speech_en": "Hello Karthik. Based on your CIBIL score of 780, an instant personal loan of ₹12 Lakhs has been approved at 10.75% APR."
     }
 }
 
-HISTORICAL_TILES = {
-    "2014": "https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    "2016": "https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    "2018": "https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    "2020": "https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    "2022": "https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    "2024": "https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    "2025": "https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-}
+# OTP Storage (Mock memory)
+OTP_STORE = {}
 
-# -------------------------------------------------------------
-# 3. UNIVERSAL DIGIPIN GENERATOR & DECODER
-# -------------------------------------------------------------
-def decode_any_digipin(query_str):
-    clean = query_str.strip().upper().replace(" ", "").replace("-", "")
-    for key, data in LANDMARK_DB.items():
-        if key.upper().replace(" ", "").replace("-", "") == clean:
-            return data
-            
-    hash_val = abs(hash(clean))
-    if clean.startswith("M9") or "KPR" in clean or "COIMBATORE" in clean:
-        return LANDMARK_DB["M9F 4LLM LFC"]
-    elif clean.startswith("M8") or "ADAMBAI" in clean or "PATTUKKOTTAI" in clean:
-        return LANDMARK_DB["M8J LJLC 5C2"]
-        
-    lat = 10.5000 + (hash_val % 1500) / 1000.0
-    lon = 79.2000 + ((hash_val >> 2) % 1200) / 1000.0
-    formatted = f"DIGI-{(hash_val%900+100)}-{((hash_val>>3)%900+100)}"
-    patta_num = str(1000 + (hash_val % 850))
-    survey_num = f"{100 + (hash_val % 120)} / 2A"
-    
-    return {
-        "formatted": formatted,
-        "lat": round(lat, 4), "lon": round(lon, 4),
-        "name": f"டிஜிபின் {formatted} (தமிழ்நாடு மண்டலம்)",
-        "pattaNo": patta_num, "oldPattaNo": f"{int(patta_num)-120} (பழைய பட்டா)", "surveyNo": survey_num,
-        "ownerName": "பதிவு செய்யப்பட்ட நில உரிமையாளர் (Verified Patta Holder)",
-        "landType": "நன்செய் பட்டா விவசாய நிலம் (Agricultural / Farm Plot)",
-        "extent": f"{round(0.5 + (hash_val%250)/100.0, 2)} ஏக்கர்",
-        "street": "பிரதான கிராம தெரு & தோப்பு சாலை",
-        "govtBuilding": "🏛️ கிராம ஊராட்சி மன்ற அலுவலகம் (400m)",
-        "waterBody": "🌊 பாசன கால்வாய் & நீர்நிலை (200m)",
-        "busStop": "🚌 கிராம பேருந்து நிறுத்தம் (300m)",
-        "taluk": "பட்டுக்கோட்டை / தஞ்சாவூர் தாலுகா - 614602",
-        "constVal": f"+{100 + (hash_val%300)} m²",
-        "vegVal": f"+{round(10.0 + (hash_val%200)/10.0, 1)}%",
-        "roadVal": "+250m",
-        "waterVal": "பாசன வாய்க்கால் சீரானது",
-        "reportTa": f"டிஜிபின் {formatted} பகுதி ஆய்வு அறிக்கை: இட அமைவு அட்சரேகை {round(lat, 4)}° N, தீர்க்கரேகை {round(lon, 4)}° E. பட்டா எண் {patta_num}, புல எண் {survey_num}. நில உரிமை மற்றும் செயற்கைக்கோள் AI ஆய்வு நிறைவு பெற்றது."
+def calculate_emi(principal, annual_rate, tenure_months):
+    if tenure_months <= 0 or principal <= 0:
+        return 0
+    monthly_rate = (annual_rate / 12.0) / 100.0
+    emi = (principal * monthly_rate * math.pow(1 + monthly_rate, tenure_months)) / (math.pow(1 + monthly_rate, tenure_months) - 1)
+    return round(emi)
+
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+@app.route('/api/send-otp', methods=['POST'])
+def send_otp():
+    data = request.json or {}
+    pan = data.get('pan', '').strip().upper()
+    mobile = data.get('mobile', '').strip()
+
+    if len(pan) != 10:
+        return jsonify({"success": False, "message": "Invalid PAN Number. Must be 10 alphanumeric characters."}), 400
+    if len(mobile) < 10:
+        return jsonify({"success": False, "message": "Invalid Mobile Number. Must be 10 digits."}), 400
+
+    otp = str(random.randint(100000, 999999))
+    OTP_STORE[mobile] = {
+        "otp": otp,
+        "pan": pan,
+        "timestamp": datetime.now().isoformat()
     }
 
-# --- HEADER ---
-col_h1, col_h2 = st.columns([3, 1])
-with col_h1:
-    st.title("🛰️ BhoomiAI — DIGIPIN Bitemporal Satellite & Bhashini Voice")
-    st.caption("தேசிய டிஜிபின் (DIGIPIN) பல ஆண்டு செயற்கைக்கோள் ஒப்பீடு & பாஷினி தமிழ் குரல் முறைமை")
-with col_h2:
-    lang = st.selectbox("Language / மொழி", ["தமிழ் (Tamil)", "English", "हिन्दी (Hindi)"])
+    return jsonify({
+        "success": True,
+        "message": f"OTP successfully sent to +91-XXXXX-{mobile[-4:]}",
+        "otp_code": otp,  # Exposed for automated sandbox demo testing
+        "expires_in_seconds": 600
+    })
 
-# --- SIDEBAR (User Auth, Multi-Year & DIGIPIN Generator) ---
-with st.sidebar:
-    st.header("👤 User Authentication / உள்நுழைவு")
-    user_name = st.text_input("Full Name (உங்கள் பெயர்)", value="Selvakumar")
-    user_code = st.text_input("Mobile No / VIP Passcode", value="", type="password", placeholder="Enter Mobile or Passcode")
+@app.route('/api/underwrite', methods=['POST'])
+def underwrite_loan():
+    data = request.json or {}
+    pan = data.get('pan', '').strip().upper()
+    mobile = data.get('mobile', '').strip()
+    otp = data.get('otp', '').strip()
+    gstin = data.get('gstin', '').strip().upper()
 
-    if user_code.upper() in OWNER_PASSCODES:
-        st.success("👑 VIP Access: Active (Unlimited Searches)")
+    if not otp:
+        return jsonify({"success": False, "message": "Please enter the 6-digit consent OTP."}), 400
+
+    # 1. Fetch Profile or Generate Dynamic Financial Underwriting
+    if pan in PROFILES_DB:
+        profile = dict(PROFILES_DB[pan])
     else:
-        st.info("🎁 Free Searches: 3 Left")
+        # Dynamic deterministic underwriting engine for any custom PAN
+        hash_val = abs(hash(pan + mobile))
+        cibil = 700 + (hash_val % 180)
+        salary = 60000 + (hash_val % 150000)
+        bank_bal = 100000 + (hash_val % 800000)
+        gst_rev = (1500000 + (hash_val % 7000000)) if gstin else 0
 
-    st.markdown("---")
-    st.subheader("📅 Multi-Year Satellite Comparison")
-    past_year = st.selectbox("Select Past Year (முந்தைய ஆண்டு)", ["2014", "2016", "2018", "2020", "2022", "2024", "2025"], index=3)
-    curr_year = "2026 (Live Current)"
+        # AI Multi-Factor Limit Calculation
+        approved_limit = int((salary * 18 + (gst_rev * 0.25) + bank_bal * 2) / 10000) * 10000
+        approved_limit = min(max(approved_limit, 300000), 5000000)
+        rate = 10.25 + (850 - cibil) * 0.015
 
-    st.markdown("---")
-    st.subheader("⚡ Find / Generate DIGIPIN")
-    with st.expander("🔍 Generate DIGIPIN for any Land / Plot", expanded=False):
-        gen_village = st.text_input("Village Name (கிராமம்)", value="அதம்பை தெற்கு")
-        gen_survey = st.text_input("Survey No (புல எண்)", value="142/2A")
-        if st.button("Generate DIGIPIN from Patta / Survey"):
-            st.success("✅ Generated DIGIPIN: **M8J-LJLC-5C2**")
-            st.caption(f"Linked to Patta #1408, Survey #{gen_survey} ({gen_village})")
+        profile = {
+            "pan": pan,
+            "name": "Verified Registered Applicant",
+            "mobile": mobile,
+            "email": f"applicant.{pan[:5].lower()}@domain.in",
+            "applicant_type": "MSME / Salaried Enterprise" if gstin else "Salaried Professional",
+            "company": "Verified Enterprise Employer (EPFO / MCA Verified)",
+            "role": "Senior Manager / Technical Lead",
+            "monthly_salary": salary,
+            "cibil_score": cibil,
+            "cibil_grade": "Prime (Low Risk)" if cibil >= 750 else "Standard Credit Rating",
+            "active_loans_count": (hash_val % 3) + 1,
+            "active_loans_debt": approved_limit * 2,
+            "current_monthly_emi": int(salary * 0.35),
+            "foir_ratio": 35.0,
+            "bureau_overdue": 0,
+            "bank_avg_balance": bank_bal,
+            "bank_monthly_inflow": salary + int(salary * 0.15),
+            "gst_turnover": gst_rev,
+            "max_approved_limit": approved_limit,
+            "interest_rate": round(rate, 2),
+            "risk_category": "Tier-1 Low Risk",
+            "speech_ta": f"பான் எண் {pan} கடன் ஆய்வு அறிக்கை: CIBIL ஸ்கோர் {cibil}, வங்கி மற்றும் பணி விவரங்கள் ஆய்வு செய்யப்பட்டு ₹{approved_limit:,} வரை கடன் வரம்பு ஒப்புதல் செய்யப்பட்டுள்ளது.",
+            "speech_en": f"Underwriting complete for PAN {pan}. Based on CIBIL score {cibil}, pre-approved loan limit is ₹{approved_limit:,} at {round(rate, 2)}% APR."
+        }
 
-# --- PROMINENT DIGIPIN SEARCH HERO ---
-st.markdown("### 📍 National DIGIPIN & Ground Location Search")
+    # Generate 3 Standard Loan Options
+    default_amount = int(profile["max_approved_limit"] * 0.6)
+    tenure_options = [
+        {"tenure_months": 12, "emi": calculate_emi(default_amount, profile["interest_rate"], 12)},
+        {"tenure_months": 24, "emi": calculate_emi(default_amount, profile["interest_rate"], 24)},
+        {"tenure_months": 36, "emi": calculate_emi(default_amount, profile["interest_rate"], 36)},
+        {"tenure_months": 48, "emi": calculate_emi(default_amount, profile["interest_rate"], 48)},
+        {"tenure_months": 60, "emi": calculate_emi(default_amount, profile["interest_rate"], 60)}
+    ]
 
-# Quick Preset Buttons
-p_cols = st.columns(4)
-current_search_val = "M9F 4LLM LFC"
+    return jsonify({
+        "success": True,
+        "profile": profile,
+        "tenure_options": tenure_options,
+        "default_selected": {
+            "amount": default_amount,
+            "tenure_months": 36,
+            "monthly_emi": calculate_emi(default_amount, profile["interest_rate"], 36)
+        },
+        "sanction_ref": f"SANCT-{datetime.now().strftime('%Y%m%d')}-{random.randint(1000, 9999)}",
+        "timestamp": datetime.now().strftime("%d-%m-%Y %I:%M:%S %p")
+    })
 
-with p_cols[0]:
-    if st.button("🏫 KPR கல்லூரி, கோவை (M9F 4LLM LFC)", use_container_width=True):
-        current_search_val = "M9F 4LLM LFC"
-with p_cols[1]:
-    if st.button("🥥 அதம்பை தெற்கு (M8J LJLC 5C2)", use_container_width=True):
-        current_search_val = "M8J LJLC 5C2"
-with p_cols[2]:
-    if st.button("🎯 Fly to My Live Location (GPS)", use_container_width=True):
-        current_search_val = "M8J LJLC 5C2"
-        st.toast("📍 Live GPS Centered: Adambai South (Lat: 10.4326° N, Lon: 79.3184° E)")
-with p_cols[3]:
-    if st.button("🌾 Thanjavur Cauvery Delta", use_container_width=True):
-        current_search_val = "TN-TNJ-881-12B"
+@app.route('/api/calculate-emi', methods=['POST'])
+def get_custom_emi():
+    data = request.json or {}
+    amount = float(data.get('amount', 500000))
+    rate = float(data.get('rate', 10.5))
+    tenure = int(data.get('tenure_months', 36))
 
-c_srch1, c_srch2 = st.columns([4, 1])
-with c_srch1:
-    search_input = st.text_input("Enter ANY DIGIPIN or Place Name", value=current_search_val)
-with c_srch2:
-    st.write("")
-    st.write("")
-    run_btn = st.button("🚀 Search & Compare", use_container_width=True)
+    emi = calculate_emi(amount, rate, tenure)
+    total_payable = emi * tenure
+    total_interest = total_payable - amount
 
-# Resolve Location & DIGIPIN Data
-loc_data = decode_any_digipin(search_input)
+    return jsonify({
+        "success": True,
+        "monthly_emi": emi,
+        "total_payable": total_payable,
+        "total_interest": total_interest,
+        "principal": amount
+    })
 
-# Display DIGIPIN Hero Banner
-st.markdown(f"""
-<div class="digipin-hero">
-  <div style="display:flex; justify-content:space-between; align-items:center;">
-    <div>
-      <span style="font-size:11px; color:#94a3b8; text-transform:uppercase; font-weight:bold;">OFFICIAL INDIA POST 4M × 4M DIGIPIN NUMBER:</span>
-      <div class="digipin-badge">📍 {loc_data['formatted']}</div>
-      <div style="font-size:12.5px; color:#f8fafc; font-weight:bold; margin-top:2px;">{loc_data['name']}</div>
-    </div>
-    <div style="text-align:right;">
-      <span style="background:#0284c7; color:#fff; font-size:11px; font-weight:bold; padding:4px 10px; border-radius:6px;">GPS: {loc_data['lat']}° N, {loc_data['lon']}° E</span>
-      <div style="font-size:11px; color:#fbbf24; margin-top:4px;">Historical {past_year} (Left) ⇄ Current {curr_year} (Right)</div>
-    </div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+@app.route('/api/disburse', methods=['POST'])
+def disburse_loan():
+    data = request.json or {}
+    amount = data.get('amount', 500000)
+    pan = data.get('pan', 'ABCDE1234F')
+    account_no = data.get('account_no', 'XXXXXXXX4589')
+    ifsc = data.get('ifsc', 'HDFC0001234')
 
-# --- DUAL-WINDOW MAP VIEWPORT & ANALYTICS ---
-col_map, col_info = st.columns([1.35, 0.65])
+    utr_number = f"IMPS{datetime.now().strftime('%Y%m%d%H%M%S')}{random.randint(100, 999)}"
 
-with col_map:
-    st.subheader(f"🪟 Multi-Year Satellite Dual Comparison (Past {past_year} vs. Current {curr_year})")
+    return jsonify({
+        "success": True,
+        "status": "DISBURSED (200 OK)",
+        "utr_number": utr_number,
+        "disbursed_amount": amount,
+        "credited_account": account_no,
+        "bank_ifsc": ifsc,
+        "disbursal_timestamp": datetime.now().strftime("%d-%m-%Y %I:%M:%S %p"),
+        "message": f"₹{amount:,} has been credited successfully to your bank account via instant IMPS transfer."
+    })
 
-    # Side-by-Side Dual Map Windows
-    c_map_past, c_map_curr = st.columns(2)
-    lat, lon = loc_data['lat'], loc_data['lon']
-
-    with c_map_past:
-        st.markdown(f"**◀ REAL PAST SATELLITE: {past_year}**")
-        past_tile = HISTORICAL_TILES.get(past_year, HISTORICAL_TILES["2020"])
-        
-        m_past = folium.Map(location=[lat, lon], zoom_start=16, tiles=None, zoom_control=False)
-        folium.TileLayer(tiles=past_tile, attr=f'Historical {past_year} Imagery &copy; Esri Clarity', max_zoom=19).add_to(m_past)
-        
-        # 4m DIGIPIN Cell Marker
-        folium.Rectangle(
-            bounds=[[lat - 0.00015, lon - 0.00015], [lat + 0.00015, lon + 0.00015]],
-            color='#f59e0b', weight=2, fill=True, fill_color='#f59e0b', fill_opacity=0.6,
-            popup=f"📍 DIGIPIN Cell: {loc_data['formatted']}"
-        ).add_to(m_past)
-        
-        st_folium(m_past, width=380, height=380, key="map_past")
-
-    with c_map_curr:
-        st.markdown(f"**CURRENT 2026 LIVE (AI OVERLAYS) ▶**")
-        curr_tile = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-        
-        m_curr = folium.Map(location=[lat, lon], zoom_start=16, tiles=None, zoom_control=False)
-        folium.TileLayer(tiles=curr_tile, attr='Current 2026 High-Res Satellite &copy; Esri', max_zoom=19).add_to(m_curr)
-        
-        # Blue Bounding Box: New Construction
-        folium.Rectangle(
-            bounds=[[lat + 0.0003, lon + 0.0003], [lat + 0.0012, lon + 0.0015]],
-            color='#38bdf8', weight=3, fill=True, fill_color='#0284c7', fill_opacity=0.4,
-            popup=f"🟦 AI Detected: New Construction ({loc_data.get('constVal', '+160 m²')})"
-        ).add_to(m_curr)
-
-        # Green Polygon: Crop & Canopy Growth
-        folium.Rectangle(
-            bounds=[[lat - 0.0022, lon - 0.0022], [lat - 0.0005, lon - 0.0005]],
-            color='#10b981', weight=2, fill=True, fill_color='#10b981', fill_opacity=0.3,
-            popup=f"🟩 AI Detected: Green Cover ({loc_data.get('vegVal', '+24.8%')})"
-        ).add_to(m_curr)
-
-        st_folium(m_curr, width=380, height=380, key="map_curr")
-
-with col_info:
-    # 1. Digital Patta & Owner Lineage Card
-    st.markdown(f"""
-    <div class="patta-card">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-        <b style="color:#34d399; font-size:12.5px;">📜 Official Digital Patta & Owner Lineage</b>
-        <span style="background:#10b981; color:#0f172a; font-size:9px; font-weight:bold; padding:2px 6px; border-radius:10px;">தமிழ் நிலம் VERIFIED</span>
-      </div>
-      <div style="font-size:11.5px; line-height:1.6;">
-        📜 <b>தற்போதைய பட்டா எண் ({curr_year}):</b> <span style="color:#34d399; font-weight:bold;">{loc_data.get('pattaNo', '1408')}</span> (மூலப் பட்டா: {loc_data.get('oldPattaNo', '824')})<br/>
-        📍 <b>புல எண் / உட்பிரிவு:</b> <span style="color:#38bdf8; font-weight:bold;">{loc_data.get('surveyNo', '142/2A')}</span><br/>
-        👤 <b>நில உரிமையாளர்:</b> <b>{loc_data.get('ownerName', 'செல்வகுமார் பன்னீர்செல்வம்')}</b><br/>
-        🌾 <b>வகைப்பாடு:</b> {loc_data.get('landType', 'நன்செய் பட்டா நிலம்')}<br/>
-        📐 <b>பரப்பளவு:</b> <b style="color:#fbbf24;">{loc_data.get('extent', '0.85 ஏக்கர்')}</b>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # 2. Exact Ground Landmark Card
-    st.markdown(f"""
-    <div class="landmark-card">
-      <b style="color:#38bdf8; font-size:12px;">🏛️ Exact Ground Landmark & Street</b>
-      <div style="font-size:11.5px; margin-top:4px; line-height:1.5;">
-        🛣️ <b>தெரு:</b> {loc_data.get('street', 'அதம்பை தெற்கு மெயின் ரோடு')}<br/>
-        🏛️ <b>அரசு கட்டடம்:</b> {loc_data.get('govtBuilding', 'கிராம ஊராட்சி மன்ற அலுவலகம் (350m)')}<br/>
-        🌊 <b>நீர்நிலை:</b> {loc_data.get('waterBody', 'கல்லணைக் கால்வாய் (180m)')}<br/>
-        🚌 <b>பேருந்து நிறுத்தம்:</b> {loc_data.get('busStop', 'பேருந்து நிறுத்தம் (220m)')}<br/>
-        📍 <b>தாலுகா / மாவட்டம்:</b> {loc_data.get('taluk', 'பட்டுக்கோட்டை, தஞ்சாவூர் - 614602')}
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # 3. Multi-Year Changes Telemetry
-    c_m1, c_m2 = st.columns(2)
-    with c_m1:
-        st.metric("New Construction", loc_data.get('constVal', '+160 m²'))
-        st.metric("New Roadways", loc_data.get('roadVal', '+280m'))
-    with c_m2:
-        st.metric("Green Canopy Delta", loc_data.get('vegVal', '+24.8%'))
-        st.metric("Water Body Status", loc_data.get('waterVal', 'பாசன வாய்க்கால் சீரானது'))
-
-    # 4. Bhashini Tamil Voice Box
-    st.markdown(f"""
-    <div class="bhashini-card">
-      <b style="color:#38bdf8; font-size:12px;">🇮🇳 பாஷினி AI தமிழ் குரல் அறிக்கை (Tamil Audio)</b>
-      <div style="font-size:11.5px; margin-top:4px; line-height:1.5;">
-        {loc_data.get('reportTa', '')}
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    if st.button("🔊 Generate & Play Tamil Voice (குரல் கேட்க)", use_container_width=True):
-        tts = gTTS(text=loc_data.get('reportTa', ''), lang='ta', slow=False)
-        tts.save("temp_voice.mp3")
-        st.audio("temp_voice.mp3", format="audio/mp3")
-
-st.markdown("---")
-st.caption("© 2026 BhoomiAI • National DIGIPIN & Satellite Intelligence Platform")
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
