@@ -1,11 +1,11 @@
 {
-  "name": "loanfast-ai",
+  "name": "bhoomi-ai-digipin",
   "version": "1.0.0",
-  "description": "LoanFast AI — Instant Digital Lending & Underwriting Platform (Flask + Vercel)",
+  "description": "BhoomiAI — DIGIPIN Satellite AI Change Detection & Bhashini Voice Intelligence System",
   "scripts": {
-    "start": "python app.py"
+    "start": "npx serve ."
   },
-  "keywords": ["fintech", "lending", "cibil", "rbi-account-aggregator", "underwriting", "flask", "vercel"],
-  "author": "LoanFast AI Labs",
+  "keywords": ["digipin", "isro", "sentinel-2", "satellite-ai", "change-detection", "bhashini", "tamil"],
+  "author": "BhoomiAI Labs",
   "license": "MIT"
 }
