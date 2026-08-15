@@ -1,0 +1,11 @@
+{
+  "name": "loanfast-ai",
+  "version": "1.0.0",
+  "description": "LoanFast AI — Instant Digital Lending & Underwriting Platform (Flask + Vercel)",
+  "scripts": {
+    "start": "python app.py"
+  },
+  "keywords": ["fintech", "lending", "cibil", "rbi-account-aggregator", "underwriting", "flask", "vercel"],
+  "author": "LoanFast AI Labs",
+  "license": "MIT"
+}
